@@ -3,54 +3,52 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 
-# 1. Configuración de la página
+# 1. Configuración de alto rendimiento
 st.set_page_config(
-    page_title="Laboratorio de Densidad Pro",
+    page_title="Laboratorio de Densidad 3.0",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Estilos globales para integrar el componente perfectamente
+# Estilos CSS para asegurar que la app se vea limpia y oscura
 st.markdown("""
 <style>
     .stApp { background-color: #020617; }
     header { visibility: hidden; }
     footer { visibility: hidden; }
-    .stAlert { border-radius: 20px; background-color: #0f172a; border: 1px solid #1e293b; color: #94a3b8; }
-    div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) { padding: 0; }
+    /* Eliminar espacios innecesarios */
+    .block-container { padding-top: 0rem; padding-bottom: 0rem; }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Declaración del componente de React
-# Nota: En este entorno de desarrollo, el componente se sirve en el mismo host.
-# Usamos declare_component para establecer la comunicación bidireccional.
-parent_dir = os.path.dirname(os.path.abspath(__file__))
-_density_explorer = components.declare_component(
-    "density_explorer",
-    path=parent_dir # Esto le dice a Streamlit que busque el index.html en la raíz
+# 2. Conexión con el componente React
+# Obtenemos la ruta absoluta de la carpeta actual
+current_path = os.path.dirname(os.path.abspath(__file__))
+
+# Declaramos el componente. Streamlit buscará el index.html
+_density_lab = components.declare_component(
+    "density_lab",
+    path=current_path
 )
 
-def main():
-    # Renderizamos el componente de React
-    # Este componente maneja toda la simulación a 60fps
-    result = _density_explorer()
+def run_app():
+    # El componente devuelve 'result' cuando el usuario mueve los sliders
+    # Por defecto es None hasta que el componente se monta en el navegador
+    result = _density_lab()
 
-    # 3. Manejo seguro de los datos devueltos (Evita el TypeError)
-    if result is not None:
-        # Extraemos los datos enviados por App.tsx
-        # Usamos .get() por seguridad para evitar errores si falta alguna clave
-        mass = result.get('mass', 150)
-        volume = result.get('volume', 300)
-        liquid_density = result.get('liquidDensity', 1.0)
-        is_floating = result.get('isFloating', True)
-        
-        # Aquí podrías añadir lógica adicional en Python si fuera necesario,
-        # pero como el Tutor IA ya está integrado en el componente React (App.tsx),
-        # no necesitamos duplicar la lógica aquí para mantener la velocidad.
+    if result is None:
+        # Pantalla de carga elegante mientras React se inicia
+        st.markdown("""
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; color: #6366f1;">
+                <h2 style="font-family: sans-serif; font-weight: 900; letter-spacing: -0.05em;">CARGANDO LABORATORIO...</h2>
+                <p style="color: #475569; font-size: 0.8rem; font-weight: bold;">PREPARANDO SIMULACIÓN FÍSICA Y TUTOR IA</p>
+            </div>
+        """, unsafe_allow_html=True)
     else:
-        # Mensaje de carga inicial mientras el componente React se monta
-        st.info("Cargando Laboratorio Interactivo... Si tarda demasiado, refresca la página.")
+        # Si quisiéramos hacer algo con los datos en Python (ej. guardar en DB),
+        # lo haríamos aquí. Pero para la visualización, React ya lo hace todo.
+        pass
 
 if __name__ == "__main__":
-    main()
+    run_app()
