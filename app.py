@@ -6,169 +6,154 @@ import os
 import json
 import random
 
-# Configuración de la página
+# 1. Configuración de la página
 st.set_page_config(
-    page_title="Laboratorio de Densidad Interactivo",
+    page_title="Laboratorio de Densidad",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Estilos CSS personalizados
+# 2. Estilos CSS (Look & Feel de Laboratorio Profesional)
 st.markdown("""
     <style>
     .main { background-color: #020617; }
-    .stMetric {
-        background-color: #0f172a;
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid #1e293b;
-    }
-    div[data-testid="stMetricValue"] {
+    [data-testid="stMetricValue"] {
         font-family: 'JetBrains Mono', monospace;
-        font-weight: 800;
-        font-size: 2.5rem !important;
+        color: #6366f1;
+        font-size: 3rem !important;
     }
-    .tutor-box {
+    .tutor-card {
         background-color: #0f172a;
-        border-left: 4px solid #6366f1;
+        border-radius: 15px;
         padding: 20px;
-        border-radius: 0 12px 12px 0;
-        margin-top: 10px;
+        border: 1px solid #1e293b;
+        border-left: 5px solid #6366f1;
     }
-    .stSlider { padding-bottom: 20px; }
+    .card-title {
+        color: #94a3b8;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de materiales
+# 3. Datos de Materiales
 MATERIALS = {
-    "Manual": {"density": None, "color": "#ffffff"},
+    "Personalizado": {"density": None, "color": "#f8fafc"},
     "Madera": {"density": 0.70, "color": "#92400e"},
-    "Hielo": {"density": 0.92, "color": "#f0f9ff"},
+    "Hielo": {"density": 0.92, "color": "#bae6fd"},
     "Acero": {"density": 7.80, "color": "#64748b"},
-    "Oro": {"density": 19.30, "color": "#facc15"}
+    "Oro": {"density": 19.30, "color": "#fbbf24"}
 }
 
+# 4. Lógica de IA
 @st.cache_data(show_spinner=False)
-def get_ai_explanation(mass, volume, density):
+def get_ai_analysis(mass, volume, density):
     try:
         api_key = os.environ.get("API_KEY")
-        if not api_key:
-            return {"explanation": "Configura la API_KEY para ver el análisis.", "fact": "La densidad es masa/volumen."}
-        
+        if not api_key: return None
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-3-flash-preview')
-        
-        prompt = f"""
-        Actúa como un profesor de física. Explica brevemente por qué un objeto de {mass}g y {volume}cm³ 
-        (densidad {density:.2f} g/cm³) flota o se hunde en agua. 
-        Responde en formato JSON con las llaves 'explanation' y 'fact'.
-        """
+        prompt = f"Profesor de física: Explica en 2 frases por qué un objeto de {mass}g y {volume}cm3 con densidad {density:.2f} flota o se hunde. Incluye un dato curioso corto."
         response = model.generate_content(prompt)
-        return json.loads(response.text.replace('```json', '').replace('```', ''))
+        return response.text
     except:
-        return {
-            "explanation": f"El objeto tiene una densidad de {density:.2f} g/cm³.",
-            "fact": "El agua tiene una densidad de 1.0 g/cm³."
-        }
+        return None
 
-def render_visualizer(mass, volume, color):
+# 5. Generador de Visualización SVG
+def get_svg_sim(mass, volume, color):
     density = mass / volume
     is_floating = density <= 1.0
-    size = (volume ** 0.48) * 8 + 35
-    water_level = 240
+    # Escalar tamaño visual
+    side = (volume ** 0.45) * 10 + 20
+    water_line = 250
     
     if is_floating:
-        immersed_part = size * max(0.02, density)
-        y_pos = water_level - (size - immersed_part)
+        # Parte sumergida proporcional a la densidad
+        immersed = side * density
+        y = water_line - (side - immersed)
     else:
-        y_pos = 560 - size
-    
-    random.seed(42)
-    particles_svg = ""
-    for i in range(min(int(mass), 300)):
-        px, py = random.uniform(0.05, 0.95) * size, random.uniform(0.05, 0.95) * size
-        pr = random.uniform(1, 1.8)
-        p_color = "rgba(0,0,0,0.15)" if is_floating else "rgba(255,255,255,0.08)"
-        particles_svg += f'<circle cx="{px}" cy="{py}" r="{pr}" fill="{p_color}" />'
+        y = 550 - side # Al fondo
 
-    stroke_color = "#10b981" if is_floating else "#f43f5e"
+    stroke = "#10b981" if is_floating else "#ef4444"
     
+    # Partículas (Masa)
+    random.seed(42)
+    dots = ""
+    for _ in range(min(int(mass), 200)):
+        dx, dy = random.random()*side, random.random()*side
+        dots += f'<circle cx="{dx}" cy="{dy}" r="1.5" fill="rgba(0,0,0,0.2)"/>'
+
     return f"""
-    <div style="display: flex; justify-content: center; background: #0f172a; padding: 15px; border-radius: 16px; border: 1px solid #1e293b;">
-        <svg viewBox="0 0 800 600" style="width: 100%; max-width: 550px; height: auto;">
-            <defs>
-                <linearGradient id="wGrad" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="#1e40af" stop-opacity="0.6" />
-                    <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0.9" />
-                </linearGradient>
-            </defs>
-            <rect x="0" y="560" width="800" height="40" fill="#020617" />
-            <rect x="0" y="{water_level}" width="800" height="{600-water_level}" fill="url(#wGrad)" />
-            <line x1="0" y1="{water_level}" x2="800" y2="{water_level}" stroke="#60a5fa" stroke-width="2" stroke-dasharray="8,6" opacity="0.4" />
-            <g transform="translate({400 - size/2}, {y_pos})">
-                <rect width="{size}" height="{size}" rx="8" fill="{color}" stroke="{stroke_color}" stroke-width="3" />
-                {particles_svg}
-                <text x="{size/2}" y="{size/2 + 5}" text-anchor="middle" fill="#000" font-family="sans-serif" font-weight="900" font-size="10" opacity="0.4">
-                    ρ:{density:.2f}
-                </text>
+    <div style="display: flex; justify-content: center; background: #020617; border-radius: 20px; border: 1px solid #1e293b; padding: 20px;">
+        <svg viewBox="0 0 800 600" style="width: 100%; max-width: 600px;">
+            <rect x="0" y="{water_line}" width="800" height="350" fill="#1e40af" fill-opacity="0.4"/>
+            <line x1="0" y1="{water_line}" x2="800" y2="{water_line}" stroke="#60a5fa" stroke-width="2" stroke-dasharray="10,5"/>
+            <g transform="translate({400-side/2}, {y})">
+                <rect width="{side}" height="{side}" fill="{color}" stroke="{stroke}" stroke-width="4" rx="5"/>
+                {dots}
+                <text x="{side/2}" y="{side/2}" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="12" fill="black" opacity="0.5">ρ={density:.2f}</text>
             </g>
+            <text x="10" y="240" font-family="sans-serif" font-size="12" fill="#60a5fa" opacity="0.6">NIVEL AGUA (ρ=1.0)</text>
         </svg>
     </div>
     """
 
-# Título Principal (Fuera de fragmento)
-st.title("🧪 Laboratorio de Densidad")
-st.markdown("Mueve los deslizadores para observar cómo cambian las partículas y el tamaño del objeto.")
+# 6. Interfaz de Usuario
+st.title("🧪 Simulador de Densidad")
+st.write("Explora cómo la relación entre masa y volumen determina si un objeto flota.")
 
-# Encabezado del Sidebar (Fuera de fragmento para evitar errores de API)
-with st.sidebar:
-    st.markdown("### 📊 Controles del Experimento")
+# Columnas principales
+col_sim, col_ctrl = st.columns([3, 2], gap="large")
 
-@st.fragment
-def experiment_block():
-    # Sliders en el sidebar (dentro del fragmento para que solo actualicen esto)
-    with st.sidebar:
-        m_choice = st.selectbox("Material de referencia", list(MATERIALS.keys()), index=0)
-        
-        d_val = MATERIALS[m_choice]["density"]
-        init_v = 300
-        init_m = int(init_v * d_val) if d_val else 150
-        
-        mass_val = st.slider("Masa (g)", 1, 1000, init_m if d_val else 150)
-        vol_val = st.slider("Volumen (cm³)", 10, 1000, init_v if d_val else 300)
+with col_ctrl:
+    st.markdown('<p class="card-title">Configuración del Objeto</p>', unsafe_allow_html=True)
     
-    curr_density = mass_val / vol_val
-    curr_color = MATERIALS[m_choice]["color"]
+    # Selección de Material
+    mat_name = st.selectbox("Selecciona un material:", list(MATERIALS.keys()))
+    mat_data = MATERIALS[mat_name]
     
-    c1, c2 = st.columns([2, 1])
+    # Valores iniciales según material
+    default_vol = 300
+    if mat_data["density"]:
+        default_mass = int(default_vol * mat_data["density"])
+    else:
+        default_mass = 150
+
+    # Sliders (Fuera de fragmentos para evitar errores)
+    mass = st.slider("Masa (g)", 1, 1000, default_mass)
+    volume = st.slider("Volumen (cm³)", 10, 1000, default_vol)
     
-    with c1:
-        st.markdown(f"#### Simulación")
-        components.html(render_visualizer(mass_val, vol_val, curr_color), height=480)
-        
-        if curr_density <= 1.0:
-            st.success(f"**FLOTA** (ρ={curr_density:.2f})")
-        else:
-            st.error(f"**SE HUNDE** (ρ={curr_density:.2f})")
+    density = mass / volume
+    
+    # Métricas
+    st.divider()
+    st.metric("Densidad Resultante", f"{density:.2f} g/cm³")
+    
+    if density <= 1.0:
+        st.success("✅ El objeto es menos denso que el agua: **FLOTA**")
+    else:
+        st.error("❌ El objeto es más denso que el agua: **SE HUNDE**")
 
-    with c2:
-        st.markdown("#### Datos")
-        st.metric("Densidad (ρ)", f"{curr_density:.2f}", f"{curr_density-1:.2f} g/cm³", delta_color="inverse")
-        
-        st.divider()
-        st.markdown("##### 🤖 Tutoría IA")
-        ai_info = get_ai_explanation(mass_val, vol_val, curr_density)
-        st.markdown(f"""
-        <div class="tutor-box">
-            <p style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 10px;">{ai_info['explanation']}</p>
-            <p style="color: #fbbf24; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px;">SABÍAS QUE...</p>
-            <p style="color: #94a3b8; font-size: 0.75rem; font-style: italic;">{ai_info['fact']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-# Ejecutar el fragmento
-experiment_block()
+with col_sim:
+    # Renderizado de la simulación
+    html_sim = get_svg_sim(mass, volume, mat_data["color"])
+    components.html(html_sim, height=500)
+    
+    # Panel de IA
+    st.markdown('<div class="tutor-card">', unsafe_allow_html=True)
+    st.markdown('<p class="card-title">✨ Análisis del Tutor IA</p>', unsafe_allow_html=True)
+    
+    explanation = get_ai_analysis(mass, volume, density)
+    if explanation:
+        st.info(explanation)
+    else:
+        st.write(f"Un objeto con masa de {mass}g y volumen de {volume}cm³ tiene una densidad de {density:.2f} g/cm³.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
-st.caption("Física Interactiva • Optimizado para Streamlit Cloud")
+st.caption("Física Interactiva • Creado para Estudiantes")
