@@ -36,7 +36,6 @@ st.markdown("""
         border-radius: 0 12px 12px 0;
         margin-top: 10px;
     }
-    /* Estilo para los sliders en el sidebar */
     .stSlider { padding-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
@@ -50,7 +49,6 @@ MATERIALS = {
     "Oro": {"density": 19.30, "color": "#facc15"}
 }
 
-# Lógica de Gemini (con caché para no ralentizar los fragmentos)
 @st.cache_data(show_spinner=False)
 def get_ai_explanation(mass, volume, density):
     try:
@@ -64,7 +62,7 @@ def get_ai_explanation(mass, volume, density):
         prompt = f"""
         Actúa como un profesor de física. Explica brevemente por qué un objeto de {mass}g y {volume}cm³ 
         (densidad {density:.2f} g/cm³) flota o se hunde en agua. 
-        Responde en formato JSON con las llaves 'explanation' y 'fact' (un dato curioso corto).
+        Responde en formato JSON con las llaves 'explanation' y 'fact'.
         """
         response = model.generate_content(prompt)
         return json.loads(response.text.replace('```json', '').replace('```', ''))
@@ -74,7 +72,6 @@ def get_ai_explanation(mass, volume, density):
             "fact": "El agua tiene una densidad de 1.0 g/cm³."
         }
 
-# Renderizador SVG
 def render_visualizer(mass, volume, color):
     density = mass / volume
     is_floating = density <= 1.0
@@ -89,7 +86,7 @@ def render_visualizer(mass, volume, color):
     
     random.seed(42)
     particles_svg = ""
-    for i in range(min(int(mass), 350)):
+    for i in range(min(int(mass), 300)):
         px, py = random.uniform(0.05, 0.95) * size, random.uniform(0.05, 0.95) * size
         pr = random.uniform(1, 1.8)
         p_color = "rgba(0,0,0,0.15)" if is_floating else "rgba(255,255,255,0.08)"
@@ -109,7 +106,7 @@ def render_visualizer(mass, volume, color):
             <rect x="0" y="560" width="800" height="40" fill="#020617" />
             <rect x="0" y="{water_level}" width="800" height="{600-water_level}" fill="url(#wGrad)" />
             <line x1="0" y1="{water_level}" x2="800" y2="{water_level}" stroke="#60a5fa" stroke-width="2" stroke-dasharray="8,6" opacity="0.4" />
-            <g transform="translate({400 - size/2}, {y_pos})" style="transition: transform 0.4s ease-out;">
+            <g transform="translate({400 - size/2}, {y_pos})">
                 <rect width="{size}" height="{size}" rx="8" fill="{color}" stroke="{stroke_color}" stroke-width="3" />
                 {particles_svg}
                 <text x="{size/2}" y="{size/2 + 5}" text-anchor="middle" fill="#000" font-family="sans-serif" font-weight="900" font-size="10" opacity="0.4">
@@ -120,34 +117,34 @@ def render_visualizer(mass, volume, color):
     </div>
     """
 
-# --- FRAGMENTO DE EXPERIMENTACIÓN ---
+# Título Principal (Fuera de fragmento)
+st.title("🧪 Laboratorio de Densidad")
+st.markdown("Mueve los deslizadores para observar cómo cambian las partículas y el tamaño del objeto.")
+
+# Encabezado del Sidebar (Fuera de fragmento para evitar errores de API)
+with st.sidebar:
+    st.markdown("### 📊 Controles del Experimento")
+
 @st.fragment
 def experiment_block():
-    # El uso de st.sidebar dentro de un fragmento permite que los sliders solo actualicen el fragmento
+    # Sliders en el sidebar (dentro del fragmento para que solo actualicen esto)
     with st.sidebar:
-        st.image("https://img.icons8.com/fluency/96/physics.png", width=50)
-        st.title("Controles")
+        m_choice = st.selectbox("Material de referencia", list(MATERIALS.keys()), index=0)
         
-        m_choice = st.selectbox("Material", list(MATERIALS.keys()), index=0)
-        
-        # Valores por defecto si se elige material
         d_val = MATERIALS[m_choice]["density"]
         init_v = 300
         init_m = int(init_v * d_val) if d_val else 150
         
-        # Sliders (Usan keys únicas para el fragmento)
-        mass_val = st.slider("Masa (g)", 1, 1000, init_m if d_val else None)
-        vol_val = st.slider("Volumen (cm³)", 10, 1000, init_v if d_val else None)
-        
-    # Lógica de cálculo inmediata
+        mass_val = st.slider("Masa (g)", 1, 1000, init_m if d_val else 150)
+        vol_val = st.slider("Volumen (cm³)", 10, 1000, init_v if d_val else 300)
+    
     curr_density = mass_val / vol_val
     curr_color = MATERIALS[m_choice]["color"]
     
-    # Layout principal
     c1, c2 = st.columns([2, 1])
     
     with c1:
-        st.markdown(f"#### Visualización en Tiempo Real")
+        st.markdown(f"#### Simulación")
         components.html(render_visualizer(mass_val, vol_val, curr_color), height=480)
         
         if curr_density <= 1.0:
@@ -156,26 +153,22 @@ def experiment_block():
             st.error(f"**SE HUNDE** (ρ={curr_density:.2f})")
 
     with c2:
-        st.markdown("#### Métricas")
+        st.markdown("#### Datos")
         st.metric("Densidad (ρ)", f"{curr_density:.2f}", f"{curr_density-1:.2f} g/cm³", delta_color="inverse")
         
         st.divider()
         st.markdown("##### 🤖 Tutoría IA")
-        # El tutor se actualiza con el fragmento, pero al estar cacheado es casi instantáneo
         ai_info = get_ai_explanation(mass_val, vol_val, curr_density)
         st.markdown(f"""
         <div class="tutor-box">
             <p style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 10px;">{ai_info['explanation']}</p>
-            <p style="color: #fbbf24; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px;">DATO CURIOSO:</p>
+            <p style="color: #fbbf24; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px;">SABÍAS QUE...</p>
             <p style="color: #94a3b8; font-size: 0.75rem; font-style: italic;">{ai_info['fact']}</p>
         </div>
         """, unsafe_allow_html=True)
 
-# --- EJECUCIÓN APP ---
-st.title("🧪 Laboratorio de Densidad")
-st.markdown("Mueve los deslizadores para observar cómo cambian las partículas y el tamaño del objeto.")
-
+# Ejecutar el fragmento
 experiment_block()
 
 st.divider()
-st.caption("Física Interactiva • Optimizado con st.fragment para alta fluidez")
+st.caption("Física Interactiva • Optimizado para Streamlit Cloud")
