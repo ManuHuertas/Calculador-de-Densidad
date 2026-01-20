@@ -4,7 +4,6 @@ import Visualizer from './components/Visualizer.tsx';
 import Controls from './components/Controls.tsx';
 import TutorPanel from './components/TutorPanel.tsx';
 import { FlaskConical, Gauge, Zap, Waves } from 'lucide-react';
-import { Streamlit } from "streamlit-component-lib";
 
 const MATERIALS = [
   { name: 'Manual', density: null, color: 'fill-slate-100' },
@@ -29,35 +28,39 @@ const App: React.FC = () => {
   const density = mass / volume;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // EFECTO CRÍTICO: Notificar a Streamlit INMEDIATAMENTE
+  // Función para notificar a Streamlit solo si existe el objeto en el window
+  const notifyStreamlit = (data: any) => {
+    const st = (window as any).Streamlit;
+    if (st) {
+      try {
+        st.setComponentValue(data);
+        st.setFrameHeight();
+      } catch (e) {
+        console.warn("Error enviando datos a Streamlit", e);
+      }
+    }
+  };
+
   useEffect(() => {
-    // Primera notificación para quitar el error amarillo y la pantalla de carga de Python
-    Streamlit.setComponentReady();
-    Streamlit.setFrameHeight();
-    
-    // Enviar el primer valor para que 'result' en app.py deje de ser None
-    Streamlit.setComponentValue({
-      mass: 150,
-      volume: 300,
-      density: 0.5,
-      liquidDensity: 1.0,
-      isFloating: true
-    });
+    // Inicialización de Streamlit si está disponible
+    const st = (window as any).Streamlit;
+    if (st) {
+      st.setComponentReady();
+      st.setFrameHeight();
+    }
   }, []);
 
-  // Sincronización continua
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      Streamlit.setComponentValue({
+      notifyStreamlit({
         mass,
         volume,
         density: parseFloat(density.toFixed(4)),
         liquidDensity,
         isFloating: density <= liquidDensity
       });
-      Streamlit.setFrameHeight();
-    }, 100);
+    }, 150);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [mass, volume, liquidDensity]);
 
@@ -71,19 +74,19 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
       <nav className="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <FlaskConical className="w-5 h-5 text-indigo-500" />
           <h1 className="text-xs font-black tracking-widest uppercase">Densidad Lab</h1>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 max-w-[60%]">
           {MATERIALS.map((m) => (
             <button
               key={m.name}
               onClick={() => handleMaterialSelect(m)}
               className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${
-                selectedMaterial.name === m.name ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                selectedMaterial.name === m.name ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
               {m.name}
@@ -92,8 +95,8 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <section className="flex-1 relative bg-slate-950 p-4 flex flex-col min-h-0">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        <section className="flex-1 relative bg-slate-950 p-4 flex flex-col min-h-0 overflow-hidden">
           <Visualizer mass={mass} volume={volume} materialColor={selectedMaterial.color} liquidDensity={liquidDensity} />
           
           <div className={`absolute top-8 left-8 flex items-center gap-3 px-6 py-3 rounded-2xl border-2 font-black text-xs bg-slate-900/80 backdrop-blur-xl z-10 transition-all ${
@@ -106,7 +109,7 @@ const App: React.FC = () => {
           <div className="absolute bottom-8 right-8 flex flex-col gap-2 p-4 rounded-3xl bg-slate-900/60 border border-white/10 backdrop-blur-xl z-10">
             <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                 <Waves className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black uppercase text-slate-500">Fluido</span>
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-tighter">Tipo de Fluido</span>
             </div>
             <div className="flex gap-2">
                 {LIQUIDS.map(liq => (
@@ -114,7 +117,7 @@ const App: React.FC = () => {
                         key={liq.name}
                         onClick={() => setLiquidDensity(liq.d)}
                         className={`px-3 py-1.5 rounded-xl text-[9px] font-black transition-all border ${
-                            liquidDensity === liq.d ? liq.color + ' text-white border-transparent' : 'bg-slate-800/50 text-slate-400 border-slate-700'
+                            liquidDensity === liq.d ? liq.color + ' text-white border-transparent shadow-lg shadow-white/5' : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-500'
                         }`}
                     >
                         {liq.name}
@@ -124,10 +127,10 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <aside className="w-full lg:w-[380px] bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 overflow-y-auto">
-          <div className="p-8 border-b border-slate-800 text-center shrink-0">
+        <aside className="w-full lg:w-[380px] bg-slate-900/50 border-l border-slate-800 flex flex-col shrink-0 overflow-y-auto min-h-0">
+          <div className="p-8 border-b border-slate-800 text-center shrink-0 bg-slate-900/20">
             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
-                <Gauge className="w-4 h-4" /> DENSIDAD
+                <Gauge className="w-4 h-4" /> DENSIDAD ACTUAL
             </div>
             <div className="flex items-baseline justify-center gap-2">
               <span className={`text-6xl font-black font-mono tracking-tighter transition-colors ${density > liquidDensity ? 'text-rose-500' : 'text-emerald-500'}`}>
@@ -137,7 +140,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-6 space-y-8">
+          <div className="p-6 space-y-8 flex-1 overflow-y-auto no-scrollbar">
             <Controls mass={mass} volume={volume} onMassChange={setMass} onVolumeChange={setVolume} />
             <TutorPanel mass={mass} volume={volume} />
           </div>
@@ -147,6 +150,16 @@ const App: React.FC = () => {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: currentColor;
+          cursor: pointer;
+          border: 2px solid #0f172a;
+          box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
       `}</style>
     </div>
   );
