@@ -5,32 +5,26 @@ import { TutorObservation } from "../types.ts";
 export const getTutorExplanation = async (mass: number, volume: number): Promise<TutorObservation> => {
   const density = mass / volume;
   
-  let apiKey = "";
-  try {
-    // Acceso seguro a variables de entorno en el navegador
-    apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY || "" : "";
-  } catch (e) {
-    // Fallback silencioso si falla el acceso
-  }
+  // Acceso directo según las guías: el entorno proporciona process.env.API_KEY
+  const apiKey = process.env.API_KEY;
 
   if (!apiKey) {
     return {
-      explanation: `Calculando física básica: Con una masa de ${mass}g y un volumen de ${volume}cm³, la densidad es ${density.toFixed(2)} g/cm³.`,
+      explanation: `Calculando física básica: Masa de ${mass}g y volumen de ${volume}cm³ (Densidad: ${density.toFixed(2)} g/cm³).`,
       isFloating: density <= 1.0,
-      scientificFact: "Configura la API_KEY para obtener explicaciones avanzadas de la IA."
+      scientificFact: "Configura la API_KEY para explicaciones avanzadas."
     };
   }
 
+  // Inicialización según guías oficiales
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Actúa como un profesor de física experto. Analiza un objeto de ${mass}g y ${volume}cm³ (densidad: ${density.toFixed(2)} g/cm³). 
-  Explica su comportamiento de flotación en agua (d=1.0) y danos un dato científico curioso. 
-  Responde obligatoriamente en JSON con los campos: explanation, isFloating, scientificFact.`;
-
+  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents: `Explica por qué un objeto de masa ${mass}g y volumen ${volume}cm³ (densidad ${density.toFixed(2)} g/cm³) ${density <= 1.0 ? 'flota' : 'se hunde'} en agua pura (densidad 1.0 g/cm³).`,
       config: {
+        systemInstruction: "Eres un tutor de física. Responde siempre en formato JSON con los campos: explanation (string breve), isFloating (boolean), scientificFact (string con un dato curioso).",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -44,15 +38,18 @@ export const getTutorExplanation = async (mass: number, volume: number): Promise
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Sin respuesta");
-    return JSON.parse(text) as TutorObservation;
-  } catch (error) {
-    console.error("Error IA:", error);
+    const result = JSON.parse(response.text || "{}");
     return {
-      explanation: `La densidad calculada es de ${density.toFixed(2)} g/cm³.`,
+      explanation: result.explanation || "Análisis completado.",
+      isFloating: typeof result.isFloating === 'boolean' ? result.isFloating : density <= 1.0,
+      scientificFact: result.scientificFact || "La densidad es una propiedad intensiva."
+    };
+  } catch (error) {
+    console.error("Error en tutoría:", error);
+    return {
+      explanation: `Análisis manual: La densidad es ${density.toFixed(2)} g/cm³.`,
       isFloating: density <= 1.0,
-      scientificFact: "Dato técnico: Un objeto flota si desplaza un peso de líquido igual a su propio peso."
+      scientificFact: "Arquímedes descubrió el principio de flotabilidad en una tina."
     };
   }
 };
