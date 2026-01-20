@@ -2,14 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TutorObservation } from "../types.ts";
 
-// Initialize the Google GenAI client exclusively using process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const getTutorExplanation = async (mass: number, volume: number): Promise<TutorObservation> => {
+  // Crear instancia dentro de la función según las directrices de la SDK para entornos dinámicos
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const density = mass / volume;
-  const prompt = `Como un profesor de física experto, analiza un objeto de ${mass}g y ${volume}cm³ (ρ=${density.toFixed(2)} g/cm³).
-  Explica su comportamiento de flotación en agua (ρ=1) y danos un dato científico curioso.
-  Responde estrictamente en formato JSON con los campos: explanation, isFloating, scientificFact.`;
+  
+  const prompt = `Actúa como un profesor de física experto. Analiza un objeto de ${mass}g y ${volume}cm³ (densidad: ${density.toFixed(2)} g/cm³).
+  Explica su comportamiento de flotación y danos un dato científico curioso.
+  Responde obligatoriamente en JSON con los campos: explanation, isFloating, scientificFact.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -17,7 +17,6 @@ export const getTutorExplanation = async (mass: number, volume: number): Promise
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        // Using responseSchema to ensure structured output.
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -30,16 +29,15 @@ export const getTutorExplanation = async (mass: number, volume: number): Promise
       },
     });
 
-    // Access the .text property directly (not as a method).
     const text = response.text;
-    if (!text) throw new Error("Respuesta vacía");
+    if (!text) throw new Error("Sin respuesta");
     return JSON.parse(text);
   } catch (error) {
-    console.error("Error al obtener la explicación del tutor:", error);
+    console.error("Error IA:", error);
     return {
-      explanation: `La densidad calculada es ${density.toFixed(2)} g/cm³. Como es ${density > 1 ? 'mayor' : 'menor'} que la del agua (1.0), el objeto se ${density > 1 ? 'hunde' : 'mantiene a flote'}.`,
-      isFloating: density <= 1,
-      scientificFact: "Dato curioso: El Mar Muerto es tan denso debido a su salinidad que los humanos flotan en él sin esfuerzo."
+      explanation: `La densidad es de ${density.toFixed(2)} g/cm³. Si esto es menor que la del líquido, flotará.`,
+      isFloating: density <= 1.0,
+      scientificFact: "El objeto más denso conocido es una estrella de neutrones."
     };
   }
 };
