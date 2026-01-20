@@ -28,32 +28,32 @@ const App: React.FC = () => {
   const density = mass / volume;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Función para notificar a Streamlit solo si existe el objeto en el window
-  const notifyStreamlit = (data: any) => {
+  // Función de utilidad para comunicarse con Streamlit
+  const sendToStreamlit = (type: string, data?: any) => {
     const st = (window as any).Streamlit;
     if (st) {
-      try {
+      if (type === 'ready') {
+        st.setComponentReady();
+      } else if (type === 'value') {
         st.setComponentValue(data);
-        st.setFrameHeight();
-      } catch (e) {
-        console.warn("Error enviando datos a Streamlit", e);
       }
+      st.setFrameHeight();
     }
   };
 
   useEffect(() => {
-    // Inicialización de Streamlit si está disponible
-    const st = (window as any).Streamlit;
-    if (st) {
-      st.setComponentReady();
-      st.setFrameHeight();
-    }
+    // Notificar inmediatamente que el componente está listo
+    sendToStreamlit('ready');
+    
+    // Ajustar altura periódicamente por si cambia el contenido dinámico
+    const interval = setInterval(() => sendToStreamlit('height'), 500);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      notifyStreamlit({
+      sendToStreamlit('value', {
         mass,
         volume,
         density: parseFloat(density.toFixed(4)),
