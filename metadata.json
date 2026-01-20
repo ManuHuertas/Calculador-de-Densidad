@@ -1,0 +1,5 @@
+{
+  "name": "Explorador de Densidad Python",
+  "description": "Simulador de física nativo en Streamlit. Calcula densidad, visualiza flotabilidad con SVG y consulta a un tutor de IA.",
+  "requestFramePermissions": []
+}
